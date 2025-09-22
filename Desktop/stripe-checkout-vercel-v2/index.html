@@ -1,0 +1,142 @@
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>Consulting Payments</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 2rem;
+      background: #f6f8fb;
+    }
+
+    .card {
+      max-width: 600px;
+      margin: 0 auto;
+      background: white;
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+    }
+
+    button {
+      background: #0066cc;
+      color: white;
+      padding: 0.8rem 1.2rem;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      background: #aaa;
+      cursor: not-allowed;
+    }
+
+    #loading {
+      display: none;
+      margin-top: 1rem;
+      color: #333;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="card">
+    <h2>Consulting Payments</h2>
+    <p>Select a consulting package or enter a custom option.</p>
+
+    <label>
+      Choose:
+      <select id="plan">
+        <option value="price_15">Consulting — $15</option>
+        <option value="price_100">Consulting — $100</option>
+        <option value="price_400">Consulting — $400</option>
+        <option value="custom">Customized Pricing</option>
+      </select>
+    </label>
+
+    <div id="custom-fields" class="hidden" style="margin-top:1rem;">
+      <input id="custom-name" type="text" placeholder="Custom product name" />
+      <input id="custom-amount" type="number" placeholder="Custom amount (USD)" />
+    </div>
+
+    <div style="margin-top:1rem;">
+      <button id="checkout">Proceed to Secure Checkout</button>
+    </div>
+
+    <div id="loading">⏳ Redirecting to Stripe Checkout...</div>
+    <div id="msg" style="margin-top:1rem;color:#c00;"></div>
+  </div>
+
+  <script>
+    const planSelect = document.getElementById("plan");
+    const customFields = document.getElementById("custom-fields");
+    const checkoutBtn = document.getElementById("checkout");
+    const loading = document.getElementById("loading");
+    const msg = document.getElementById("msg");
+
+    planSelect.addEventListener("change", () => {
+      if (planSelect.value === "custom") {
+        customFields.classList.remove("hidden");
+      } else {
+        customFields.classList.add("hidden");
+      }
+    });
+
+    checkoutBtn.addEventListener("click", async () => {
+      checkoutBtn.disabled = true;
+      loading.style.display = "block";
+      msg.textContent = "";
+
+      let body;
+      if (planSelect.value === "custom") {
+        const customName = document.getElementById("custom-name").value;
+        const customAmount = document.getElementById("custom-amount").value;
+        if (!customName || !customAmount) {
+          msg.textContent = "Enter both product name and amount.";
+          checkoutBtn.disabled = false;
+          loading.style.display = "none";
+          return;
+        }
+        body = { productName: customName, price_cents: Number(customAmount) * 100 };
+      } else {
+        // Replace placeholders with your real Stripe Price IDs
+        const priceMap = {
+          "price_15": "price_1S9zmX4ChzOR8EZ6EzPxyeit",
+          "price_100": "price_1SA03z4ChzOR8EZ6lFUEIl13",
+          "price_400": "price_1SA0VZ4ChzOR8EZ63qVp7vpjj"
+        };
+        body = { priceId: priceMap[planSelect.value] };
+      }
+
+      try {
+        const res = await fetch("/api/create-checkout-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: res.statusText }));
+          throw new Error(err.error || res.statusText);
+        }
+
+        const data = await res.json();
+        window.location = data.url;
+      } catch (err) {
+        msg.textContent = "Error: " + err.message;
+        checkoutBtn.disabled = false;
+        loading.style.display = "none";
+      }
+    });
+  </script>
+</body>
+
+</html>
